@@ -953,27 +953,32 @@ public final class GameImpl extends ScoreBoardEventProviderImpl<Game> implements
     }
     protected void restoreSnapshot() {
         restoreRunning = true;
-        ScoreBoardClock.getInstance().rewindTo(snapshot.getSnapshotTime());
-        for (Clock clock : getAll(CLOCK)) { clock.restoreSnapshot(snapshot.getClockSnapshot(clock.getProviderId())); }
-        set(IN_JAM, snapshot.inJam());
-        set(IN_PERIOD, snapshot.inPeriod());
-        set(CURRENT_PERIOD, snapshot.getCurrentPeriod());
-        getCurrentPeriod().restoreSnapshot(snapshot.getPeriodSnapshot());
-        if (getCurrentTimeout() != snapshot.getCurrentTimeout() && getCurrentTimeout() != noTimeoutDummy) {
-            getCurrentTimeout().delete();
-        }
-        set(CURRENT_TIMEOUT, snapshot.getCurrentTimeout());
-        getCurrentTimeout().set(Timeout.RUNNING, snapshot.inTimeout());
-        set(OR_IS_TO, snapshot.orIsTo());
-        set(IN_OVERTIME, snapshot.inOvertime());
-        for (Team team : getAll(TEAM)) { team.restoreSnapshot(snapshot.getTeamSnapshot(team.getProviderId())); }
-        for (BoxTrip bt : getAll(Team.BOX_TRIP)) { bt.restoreSnapshot(snapshot.getBoxTripSnapshot(bt.getId())); };
-        for (Team team : getAll(TEAM)) {
-            for (BoxTrip bt : team.getAll(Team.BOX_TRIP)) {
-                bt.restoreSnapshot(snapshot.getBoxTripSnapshot(bt.getId()));
+        try {
+            ScoreBoardClock.getInstance().rewindTo(snapshot.getSnapshotTime());
+            for (Clock clock : getAll(CLOCK)) { clock.restoreSnapshot(snapshot.getClockSnapshot(clock.getProviderId())); }
+            set(IN_JAM, snapshot.inJam());
+            set(IN_PERIOD, snapshot.inPeriod());
+            set(CURRENT_PERIOD, snapshot.getCurrentPeriod());
+            getCurrentPeriod().restoreSnapshot(snapshot.getPeriodSnapshot());
+            if (getCurrentTimeout() != snapshot.getCurrentTimeout() && getCurrentTimeout() != noTimeoutDummy) {
+                getCurrentTimeout().delete();
             }
+            set(CURRENT_TIMEOUT, snapshot.getCurrentTimeout());
+            getCurrentTimeout().set(Timeout.RUNNING, snapshot.inTimeout());
+            set(OR_IS_TO, snapshot.orIsTo());
+            set(IN_OVERTIME, snapshot.inOvertime());
+            for (Team team : getAll(TEAM)) { team.restoreSnapshot(snapshot.getTeamSnapshot(team.getProviderId())); }
+            // Restore BoxTrips: only restore from team-level to avoid double-restoring same objects
+            // BoxTrips are registered at both game and team level but they are the same object instances.
+            // The team-level iteration captures all BoxTrips without duplication.
+            for (Team team : getAll(TEAM)) {
+                for (BoxTrip bt : team.getAll(Team.BOX_TRIP)) {
+                    bt.restoreSnapshot(snapshot.getBoxTripSnapshot(bt.getId()));
+                }
+            }
+        } finally {
+            restoreRunning = false;
         }
-        restoreRunning = false;
     }
     protected void finishReplace() {
         if (replacePending != null) {
